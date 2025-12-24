@@ -3,7 +3,7 @@
     "install_msg": "The AgeGate cog has been installed! Use `[p]agegateset` to configure the settings. By default, it is turned OFF.",
     "name": "AgeGate",
     "short": "Automatically bans new accounts based on age, with temporary or permanent ban options.",
-    "description": "Helps protect against raids by automatically banning users whose accounts are newer than a configurable age in days. The ban can be set to be permanent or temporary for a configurable number of days. The ban reason is customizable and the entire feature can be toggled on or off per server.",
+    "description": "Helps protect against raids by automatically banning users whose accounts are newer than a configurable age in days. The ban can be set to be permanent or temporary for a configurable number of days. The ban reason is customizable and the entire feature can be toggled on or off per server. You may also notify only.",
     "tags": [
         "moderation",
         "admin",
