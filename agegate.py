@@ -9,10 +9,337 @@ from typing import Optional
 log = logging.getLogger("red.agegate")
 
 
+class MinAgeModal(discord.ui.Modal):
+    """Modal for setting minimum account age in seconds."""
+    
+    def __init__(self, cog, guild: discord.Guild, callback=None):
+        super().__init__(title="Set Minimum Account Age")
+        self.cog = cog
+        self.guild = guild
+        self.callback = callback
+        
+        self.days = discord.ui.TextInput(
+            label="Days",
+            placeholder="e.g., 7",
+            default="7",
+            min_length=1,
+            max_length=3
+        )
+        self.hours = discord.ui.TextInput(
+            label="Hours (0-23)",
+            placeholder="e.g., 0",
+            default="0",
+            min_length=1,
+            max_length=2,
+            required=False
+        )
+        self.add_item(self.days)
+        self.add_item(self.hours)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            days = int(self.days.value)
+            hours = int(self.hours.value) if self.hours.value else 0
+            
+            if days < 0 or hours < 0 or hours > 23:
+                await interaction.response.send_message(
+                    "❌ Days must be ≥ 0 and hours must be 0-23",
+                    ephemeral=True
+                )
+                return
+            
+            total_seconds = (days * 86400) + (hours * 3600)
+            await self.cog.config.guild(self.guild).min_age_seconds.set(total_seconds)
+            
+            readable = self.cog._seconds_to_readable(total_seconds)
+            await interaction.response.send_message(
+                f"✅ Minimum account age set to **{readable}**",
+                ephemeral=True
+            )
+            
+            if self.callback:
+                await self.callback(interaction)
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Please enter valid numbers",
+                ephemeral=True
+            )
+
+
+class BanReasonModal(discord.ui.Modal):
+    """Modal for setting ban reason."""
+    
+    def __init__(self, cog, guild: discord.Guild, callback=None):
+        super().__init__(title="Set Ban Reason")
+        self.cog = cog
+        self.guild = guild
+        self.callback = callback
+        
+        self.reason = discord.ui.TextInput(
+            label="Ban Reason",
+            placeholder="Enter the reason for banning new accounts...",
+            default="Your account is too new. Please wait until your account is older to join.",
+            min_length=1,
+            max_length=512,
+            style=discord.TextInputStyle.paragraph
+        )
+        self.add_item(self.reason)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.cog.config.guild(self.guild).ban_reason.set(self.reason.value)
+        await interaction.response.send_message(
+            f"✅ Ban reason set to: `{self.reason.value}`",
+            ephemeral=True
+        )
+        
+        if self.callback:
+            await self.callback(interaction)
+
+
+class ActionTypeModal(discord.ui.Modal):
+    """Modal for setting action type."""
+    
+    def __init__(self, cog, guild: discord.Guild, callback=None):
+        super().__init__(title="Set Action Type")
+        self.cog = cog
+        self.guild = guild
+        self.callback = callback
+        
+        self.action = discord.ui.TextInput(
+            label="Action Type (ban/delay/notify)",
+            placeholder="Enter: ban, delay, or notify",
+            default="ban",
+            min_length=3,
+            max_length=6
+        )
+        self.add_item(self.action)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        action = self.action.value.lower()
+        
+        if action not in ["ban", "delay", "notify"]:
+            await interaction.response.send_message(
+                "❌ Invalid action type. Please choose: `ban`, `delay`, or `notify`",
+                ephemeral=True
+            )
+            return
+        
+        await self.cog.config.guild(self.guild).action_type.set(action)
+        action_descriptions = {
+            "ban": "Immediately ban new accounts",
+            "delay": "Wait before banning (set delay duration next)",
+            "notify": "Only notify staff (no ban action)"
+        }
+        await interaction.response.send_message(
+            f"✅ Action type set to **{action}**: {action_descriptions[action]}",
+            ephemeral=True
+        )
+        
+        if self.callback:
+            await self.callback(interaction)
+
+
+class BanTypeModal(discord.ui.Modal):
+    """Modal for setting ban type."""
+    
+    def __init__(self, cog, guild: discord.Guild, callback=None):
+        super().__init__(title="Set Ban Type")
+        self.cog = cog
+        self.guild = guild
+        self.callback = callback
+        
+        self.ban_type = discord.ui.TextInput(
+            label="Ban Type (permanent/temporary)",
+            placeholder="Enter: permanent or temporary",
+            default="permanent",
+            min_length=9,
+            max_length=9
+        )
+        self.add_item(self.ban_type)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        ban_type = self.ban_type.value.lower()
+        
+        if ban_type not in ["permanent", "temporary"]:
+            await interaction.response.send_message(
+                "❌ Invalid type. Please choose: `permanent` or `temporary`",
+                ephemeral=True
+            )
+            return
+        
+        await self.cog.config.guild(self.guild).ban_type.set(ban_type)
+        await interaction.response.send_message(
+            f"✅ Ban type set to **{ban_type}**",
+            ephemeral=True
+        )
+        
+        if self.callback:
+            await self.callback(interaction)
+
+
+class DelayDurationModal(discord.ui.Modal):
+    """Modal for setting delay punishment duration in seconds."""
+    
+    def __init__(self, cog, guild: discord.Guild, callback=None):
+        super().__init__(title="Set Delay Duration")
+        self.cog = cog
+        self.guild = guild
+        self.callback = callback
+        
+        self.hours = discord.ui.TextInput(
+            label="Hours",
+            placeholder="e.g., 24",
+            default="24",
+            min_length=1,
+            max_length=4
+        )
+        self.minutes = discord.ui.TextInput(
+            label="Minutes (0-59)",
+            placeholder="e.g., 0",
+            default="0",
+            min_length=1,
+            max_length=2,
+            required=False
+        )
+        self.add_item(self.hours)
+        self.add_item(self.minutes)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            hours = int(self.hours.value)
+            minutes = int(self.minutes.value) if self.minutes.value else 0
+            
+            if hours <= 0 or minutes < 0 or minutes > 59:
+                await interaction.response.send_message(
+                    "❌ Hours must be > 0 and minutes must be 0-59",
+                    ephemeral=True
+                )
+                return
+            
+            total_seconds = (hours * 3600) + (minutes * 60)
+            await self.cog.config.guild(self.guild).delay_punishment_seconds.set(total_seconds)
+            
+            readable = self.cog._seconds_to_readable(total_seconds)
+            await interaction.response.send_message(
+                f"✅ Delay duration set to **{readable}**",
+                ephemeral=True
+            )
+            
+            if self.callback:
+                await self.callback(interaction)
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Please enter valid numbers",
+                ephemeral=True
+            )
+
+
+class TempBanDurationModal(discord.ui.Modal):
+    """Modal for setting temporary ban duration in seconds."""
+    
+    def __init__(self, cog, guild: discord.Guild, callback=None):
+        super().__init__(title="Set Temp Ban Duration")
+        self.cog = cog
+        self.guild = guild
+        self.callback = callback
+        
+        self.days = discord.ui.TextInput(
+            label="Days",
+            placeholder="e.g., 7",
+            default="7",
+            min_length=1,
+            max_length=3
+        )
+        self.hours = discord.ui.TextInput(
+            label="Hours (0-23)",
+            placeholder="e.g., 0",
+            default="0",
+            min_length=1,
+            max_length=2,
+            required=False
+        )
+        self.add_item(self.days)
+        self.add_item(self.hours)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            days = int(self.days.value)
+            hours = int(self.hours.value) if self.hours.value else 0
+            
+            if days <= 0 or hours < 0 or hours > 23:
+                await interaction.response.send_message(
+                    "❌ Days must be > 0 and hours must be 0-23",
+                    ephemeral=True
+                )
+                return
+            
+            total_seconds = (days * 86400) + (hours * 3600)
+            await self.cog.config.guild(self.guild).temp_ban_duration_seconds.set(total_seconds)
+            
+            readable = self.cog._seconds_to_readable(total_seconds)
+            await interaction.response.send_message(
+                f"✅ Temporary ban duration set to **{readable}**",
+                ephemeral=True
+            )
+            
+            if self.callback:
+                await self.callback(interaction)
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Please enter valid numbers",
+                ephemeral=True
+            )
+
+
+class RateLimitModal(discord.ui.Modal):
+    """Modal for setting rate limit."""
+    
+    def __init__(self, cog, guild: discord.Guild, callback=None):
+        super().__init__(title="Set Rate Limit")
+        self.cog = cog
+        self.guild = guild
+        self.callback = callback
+        
+        self.bans_per_minute = discord.ui.TextInput(
+            label="Bans Per Minute",
+            placeholder="e.g., 5",
+            default="5",
+            min_length=1,
+            max_length=2
+        )
+        self.add_item(self.bans_per_minute)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            rate = int(self.bans_per_minute.value)
+            
+            if rate <= 0:
+                await interaction.response.send_message(
+                    "❌ Rate limit must be > 0",
+                    ephemeral=True
+                )
+                return
+            
+            await self.cog.config.guild(self.guild).join_rate_limit.set(rate)
+            await interaction.response.send_message(
+                f"✅ Rate limit set to **{rate}** ban(s) per minute",
+                ephemeral=True
+            )
+            
+            if self.callback:
+                await self.callback(interaction)
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Please enter a valid number",
+                ephemeral=True
+            )
+
+
 class AgeGate(commands.Cog):
     """
     Automatically monitors and punishes new accounts based on their creation date.
     Supports: immediate ban, delayed punishment, or staff notification only.
+    All configuration via interactive modals.
     """
 
     def __init__(self, bot):
@@ -25,12 +352,12 @@ class AgeGate(commands.Cog):
 
         default_guild = {
             "enabled": False,
-            "min_age_days": 7,
+            "min_age_seconds": 604800,  # 7 days in seconds
             "ban_reason": "Your account is too new. Please wait until your account is older to join.",
             "action_type": "ban",  # "ban", "notify", or "delay"
             "ban_type": "permanent",  # "permanent" or "temporary"
-            "temp_ban_duration_days": 7,
-            "delay_punishment_hours": 24,  # Hours to wait before taking action
+            "temp_ban_duration_seconds": 604800,  # 7 days in seconds
+            "delay_punishment_seconds": 86400,  # 24 hours in seconds
             "staff_notification_channel_id": None,  # Channel ID for staff alerts
             "temp_banned_users": {},  # { "user_id": unban_timestamp }
             "delayed_members": {},  # { "user_id": action_timestamp }
@@ -50,6 +377,28 @@ class AgeGate(commands.Cog):
     def _get_logger(self):
         """Get configured logger for this cog."""
         return log
+
+    def _seconds_to_readable(self, seconds: int) -> str:
+        """Convert seconds to human-readable format (e.g., '3d 5h 30m')."""
+        if seconds == 0:
+            return "0 seconds"
+        
+        days = seconds // 86400
+        hours = (seconds % 86400) // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+        
+        parts = []
+        if days > 0:
+            parts.append(f"{days}d")
+        if hours > 0:
+            parts.append(f"{hours}h")
+        if minutes > 0:
+            parts.append(f"{minutes}m")
+        if secs > 0:
+            parts.append(f"{secs}s")
+        
+        return " ".join(parts)
 
     async def _check_rate_limit(self, guild: discord.Guild) -> bool:
         """Check if we're exceeding ban rate limits. Returns True if within limits."""
@@ -101,8 +450,9 @@ class AgeGate(commands.Cog):
                 )
                 return False
             
-            age_days = account_age.days
-            age_hours = account_age.seconds // 3600
+            account_age_seconds = int(account_age.total_seconds())
+            age_readable = self._seconds_to_readable(account_age_seconds)
+            min_age_readable = self._seconds_to_readable(settings['min_age_seconds'])
             
             embed = discord.Embed(
                 title="🚨 New Account Alert",
@@ -111,8 +461,8 @@ class AgeGate(commands.Cog):
                 timestamp=discord.utils.utcnow()
             )
             embed.add_field(name="Member", value=f"{member.mention} ({member.id})", inline=False)
-            embed.add_field(name="Account Age", value=f"{age_days}d {age_hours}h", inline=False)
-            embed.add_field(name="Minimum Required Age", value=f"{settings['min_age_days']} days", inline=False)
+            embed.add_field(name="Account Age", value=age_readable, inline=False)
+            embed.add_field(name="Minimum Required Age", value=min_age_readable, inline=False)
             embed.add_field(name="Action", value=settings["action_type"].upper(), inline=False)
             embed.set_thumbnail(url=member.display_avatar.url)
             
@@ -161,17 +511,19 @@ class AgeGate(commands.Cog):
                                 
                                 # Send DM before punishment
                                 try:
+                                    ban_duration_readable = self._seconds_to_readable(settings['temp_ban_duration_seconds'])
                                     dm_message = f"You have been automatically punished from **{guild.name}** for having a new account.\n**Reason:** {reason}"
                                     if settings["ban_type"] == "temporary":
-                                        dm_message += f"\nThis ban is temporary and will last for **{settings['temp_ban_duration_days']}** day(s)."
+                                        dm_message += f"\nThis ban is temporary and will last for **{ban_duration_readable}**."
                                     await member.send(dm_message)
                                 except (discord.Forbidden, discord.HTTPException):
                                     pass
 
                                 # Apply ban
+                                min_age_readable = self._seconds_to_readable(settings['min_age_seconds'])
                                 await guild.ban(
                                     member,
-                                    reason=f"AgeGate: Account younger than {settings['min_age_days']} days (delayed action)"
+                                    reason=f"AgeGate: Account younger than {min_age_readable} (delayed action)"
                                 )
                                 self._get_logger().info(
                                     f"[AgeGate] Delayed punishment applied to {member.display_name} ({user_id}) in {guild.name}"
@@ -263,7 +615,7 @@ class AgeGate(commands.Cog):
         now = discord.utils.utcnow()
         account_age = now - member.created_at
 
-        if account_age < timedelta(days=settings["min_age_days"]):
+        if account_age < timedelta(seconds=settings["min_age_seconds"]):
             action_type = settings["action_type"].lower()
 
             # Handle staff notification
@@ -282,10 +634,11 @@ class AgeGate(commands.Cog):
                 async with self.config.guild(guild).delayed_members() as delayed_members:
                     delayed_members[str(member.id)] = punishment_time.timestamp()
                 
-                await self._notify_staff(guild, member, account_age_seconds)
+                await self._notify_staff(guild, member, account_age)
+                delay_readable = self._seconds_to_readable(delay_seconds)
                 self._get_logger().info(
                     f"[AgeGate] Delayed punishment scheduled for {member.display_name} ({member.id}) "
-                    f"in {delay_hours} hours in {guild.name}"
+                    f"in {delay_readable} in {guild.name}"
                 )
                 return
 
@@ -302,9 +655,10 @@ class AgeGate(commands.Cog):
 
                 try:
                     # Send DM notification
+                    ban_duration_readable = self._seconds_to_readable(settings['temp_ban_duration_seconds'])
                     dm_message = f"You have been automatically banned from **{guild.name}**.\n**Reason:** {reason}"
                     if settings["ban_type"] == "temporary":
-                        dm_message += f"\nThis ban is temporary and will last for **{settings['temp_ban_duration_days']}** day(s)."
+                        dm_message += f"\nThis ban is temporary and will last for **{ban_duration_readable}**."
                     await member.send(dm_message)
                 except (discord.Forbidden, discord.HTTPException):
                     pass  # DMs closed or failed
@@ -353,50 +707,69 @@ class AgeGate(commands.Cog):
         await self.config.guild(ctx.guild).enabled.set(on_or_off)
         await ctx.send(f"✅ AgeGate is now **{'ENABLED' if on_or_off else 'DISABLED'}**.")
 
-    @agegate_settings.command(name="days")
-    async def set_days(self, ctx: commands.Context, days: int):
-        """Set the minimum account age in days."""
-        if days < 0:
-            return await ctx.send("The number of days must be 0 or greater.")
-
-        await self.config.guild(ctx.guild).min_age_days.set(days)
-        await ctx.send(f"✅ Accounts newer than **{days}** days will be monitored by AgeGate.")
-
-    @agegate_settings.command(name="reason")
-    async def set_reason(self, ctx: commands.Context, *, reason: str):
-        """Set the custom reason for handling new accounts."""
-        if len(reason) > 512:
-            return await ctx.send("The reason must be 512 characters or fewer.")
-
-        await self.config.guild(ctx.guild).ban_reason.set(reason)
-        await ctx.send(f"✅ The ban reason has been set to: `{reason}`")
-
-    @agegate_settings.command(name="action")
-    async def set_action_type(self, ctx: commands.Context, action: str):
-        """Set the action type: 'ban' (immediate), 'delay' (wait x hours), or 'notify' (staff alert only)."""
-        action = action.lower()
+    @agegate_settings.command(name="configure")
+    async def configure_agegate(self, ctx: commands.Context):
+        """Guide through all configuration options via interactive modals."""
+        step = 0
         
-        if action not in ["ban", "delay", "notify"]:
-            return await ctx.send(
-                "Invalid action type. Please choose: `ban` (immediate), `delay` (wait x hours), or `notify` (staff alert only)."
-            )
-
-        await self.config.guild(ctx.guild).action_type.set(action)
-        action_descriptions = {
-            "ban": "Immediately ban new accounts",
-            "delay": "Wait before banning (use `/agegateset delayhours` to set duration)",
-            "notify": "Only notify staff (no ban action)"
-        }
-        await ctx.send(f"✅ Action type set to **{action}**: {action_descriptions[action]}")
-
-    @agegate_settings.command(name="delayhours")
-    async def set_delay_hours(self, ctx: commands.Context, hours: int):
-        """Set the delay in hours before applying punishment (only used with 'delay' action type)."""
-        if hours <= 0:
-            return await ctx.send("The delay must be greater than 0 hours.")
-
-        await self.config.guild(ctx.guild).delay_punishment_hours.set(hours)
-        await ctx.send(f"✅ Punishment will be delayed by **{hours}** hour(s) for new accounts.")
+        async def next_step(interaction: discord.Interaction):
+            nonlocal step
+            step += 1
+            await show_modal()
+        
+        async def show_modal():
+            modals = [
+                MinAgeModal(self, ctx.guild, next_step),
+                BanReasonModal(self, ctx.guild, next_step),
+                ActionTypeModal(self, ctx.guild, next_step),
+                BanTypeModal(self, ctx.guild, next_step),
+                TempBanDurationModal(self, ctx.guild, next_step),
+                DelayDurationModal(self, ctx.guild, next_step),
+                RateLimitModal(self, ctx.guild, next_step),
+            ]
+            
+            if step < len(modals):
+                modal = modals[step]
+                # For the first modal, use the context interaction
+                if step == 0:
+                    await ctx.interaction.response.send_modal(modal)
+                else:
+                    # For subsequent modals, we need to rely on the callback
+                    pass
+            else:
+                # All modals completed
+                settings = await self.config.guild(ctx.guild).all()
+                status = "✅ ENABLED" if settings['enabled'] else "❌ DISABLED"
+                
+                embed = discord.Embed(
+                    title="✅ AgeGate Configuration Complete",
+                    description="All settings have been configured successfully!",
+                    color=discord.Color.green(),
+                    timestamp=discord.utils.utcnow()
+                )
+                
+                min_age_readable = self._seconds_to_readable(settings['min_age_seconds'])
+                embed.add_field(name="Minimum Account Age", value=f"**{min_age_readable}**", inline=False)
+                embed.add_field(name="Action Type", value=settings['action_type'].upper(), inline=True)
+                embed.add_field(name="Ban Type", value=settings['ban_type'].capitalize(), inline=True)
+                
+                if settings['action_type'] == 'delay':
+                    delay_readable = self._seconds_to_readable(settings['delay_punishment_seconds'])
+                    embed.add_field(name="Delay Duration", value=delay_readable, inline=True)
+                
+                if settings['ban_type'] == 'temporary':
+                    duration_readable = self._seconds_to_readable(settings['temp_ban_duration_seconds'])
+                    embed.add_field(name="Temp Ban Duration", value=duration_readable, inline=True)
+                
+                embed.add_field(name="Rate Limit", value=f"{settings['join_rate_limit']} ban(s)/min", inline=True)
+                embed.add_field(name="Ban Reason", value=settings['ban_reason'], inline=False)
+                
+                if ctx.interaction.response.is_done():
+                    await ctx.interaction.followup.send(embed=embed, ephemeral=True)
+                else:
+                    await ctx.interaction.response.send_message(embed=embed, ephemeral=True)
+        
+        await show_modal()
 
     @agegate_settings.command(name="staffchannel")
     async def set_staff_channel(self, ctx: commands.Context, channel: discord.TextChannel = None):
@@ -412,35 +785,6 @@ class AgeGate(commands.Cog):
             await self.config.guild(ctx.guild).staff_notification_channel_id.set(channel.id)
             await ctx.send(f"✅ Staff notifications will be sent to {channel.mention}")
 
-    @agegate_settings.command(name="bantype")
-    async def set_ban_type(self, ctx: commands.Context, ban_type: str):
-        """Set the ban type to 'permanent' or 'temporary' (only used with 'ban' action type)."""
-        ban_type = ban_type.lower()
-        
-        if ban_type not in ["permanent", "temporary"]:
-            return await ctx.send("Invalid type. Please choose either `permanent` or `temporary`.")
-
-        await self.config.guild(ctx.guild).ban_type.set(ban_type)
-        await ctx.send(f"✅ Ban type has been set to **{ban_type}**.")
-
-    @agegate_settings.command(name="duration")
-    async def set_duration(self, ctx: commands.Context, days: int):
-        """Set the duration in days for temporary bans."""
-        if days <= 0:
-            return await ctx.send("The duration for temporary bans must be greater than 0.")
-
-        await self.config.guild(ctx.guild).temp_ban_duration_days.set(days)
-        await ctx.send(f"✅ Temporary bans will now last for **{days}** day(s).")
-
-    @agegate_settings.command(name="ratelimit")
-    async def set_rate_limit(self, ctx: commands.Context, bans_per_minute: int):
-        """Set the maximum number of bans per minute to prevent join floods."""
-        if bans_per_minute <= 0:
-            return await ctx.send("Rate limit must be greater than 0.")
-
-        await self.config.guild(ctx.guild).join_rate_limit.set(bans_per_minute)
-        await ctx.send(f"✅ Rate limit set to **{bans_per_minute}** ban(s) per minute.")
-
     @agegate_settings.command(name="status", aliases=["settings"])
     async def show_settings(self, ctx: commands.Context):
         """Show the current AgeGate settings."""
@@ -450,6 +794,8 @@ class AgeGate(commands.Cog):
         action_type = settings['action_type'].upper()
         ban_type = settings['ban_type'].capitalize()
 
+        min_age_readable = self._seconds_to_readable(settings['min_age_seconds'])
+        
         embed = discord.Embed(
             title="AgeGate Configuration",
             color=await ctx.embed_color(),
@@ -457,16 +803,18 @@ class AgeGate(commands.Cog):
         )
         
         embed.add_field(name="Status", value=status, inline=False)
-        embed.add_field(name="Minimum Account Age", value=f"**{settings['min_age_days']}** days", inline=False)
+        embed.add_field(name="Minimum Account Age", value=f"**{min_age_readable}**", inline=False)
         embed.add_field(name="Action Type", value=action_type, inline=True)
         
         if settings['action_type'] == 'delay':
-            embed.add_field(name="Delay Duration", value=f"{settings['delay_punishment_hours']} hour(s)", inline=True)
+            delay_readable = self._seconds_to_readable(settings['delay_punishment_seconds'])
+            embed.add_field(name="Delay Duration", value=delay_readable, inline=True)
         
         if settings['action_type'] in ['ban', 'delay']:
             embed.add_field(name="Ban Type", value=ban_type, inline=True)
             if settings['ban_type'] == 'temporary':
-                embed.add_field(name="Temp Ban Duration", value=f"{settings['temp_ban_duration_days']} day(s)", inline=True)
+                duration_readable = self._seconds_to_readable(settings['temp_ban_duration_seconds'])
+                embed.add_field(name="Temp Ban Duration", value=duration_readable, inline=True)
 
         embed.add_field(name="Rate Limit", value=f"{settings['join_rate_limit']} ban(s)/min", inline=True)
         
