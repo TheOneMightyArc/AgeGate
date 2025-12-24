@@ -1,0 +1,19 @@
+{
+    "author": ["Azure"],
+    "install_msg": "The AgeGate cog has been installed! Use `[p]agegateset` to configure the settings. By default, it is turned OFF.",
+    "name": "AgeGate",
+    "short": "Automatically bans new accounts based on age, with temporary or permanent ban options.",
+    "description": "Helps protect against raids by automatically banning users whose accounts are newer than a configurable age in days. The ban can be set to be permanent or temporary for a configurable number of days. The ban reason is customizable and the entire feature can be toggled on or off per server.",
+    "tags": [
+        "moderation",
+        "admin",
+        "security",
+        "raid",
+        "automod",
+        "ban",
+        "tempban"
+    ],
+    "requirements": [],
+    "min_bot_version": "3.5.0",
+    "end_user_data_statement": "This cog stores server-specific settings. If temporary bans are used, it also stores the user ID and unban timestamp for temporarily banned users until they are unbanned. This data is deleted upon unbanning."
+}
