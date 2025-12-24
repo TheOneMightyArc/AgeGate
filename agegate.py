@@ -179,7 +179,7 @@ class AgeGate(commands.Cog):
 
                                 # Track for temporary bans
                                 if settings["ban_type"] == "temporary":
-                                    unban_time = discord.utils.utcnow() + timedelta(days=settings["temp_ban_duration_days"])
+                                    unban_time = discord.utils.utcnow() + timedelta(seconds=settings["temp_ban_duration_seconds"])
                                     async with self.config.guild(guild).temp_banned_users() as temp_banned_users:
                                         temp_banned_users[user_id_str] = unban_time.timestamp()
 
@@ -276,13 +276,13 @@ class AgeGate(commands.Cog):
 
             # Handle delayed punishment
             if action_type == "delay":
-                delay_hours = settings["delay_punishment_hours"]
-                punishment_time = now + timedelta(hours=delay_hours)
+                delay_seconds = settings["delay_punishment_seconds"]
+                punishment_time = now + timedelta(seconds=delay_seconds)
                 
                 async with self.config.guild(guild).delayed_members() as delayed_members:
                     delayed_members[str(member.id)] = punishment_time.timestamp()
                 
-                await self._notify_staff(guild, member, account_age)
+                await self._notify_staff(guild, member, account_age_seconds)
                 self._get_logger().info(
                     f"[AgeGate] Delayed punishment scheduled for {member.display_name} ({member.id}) "
                     f"in {delay_hours} hours in {guild.name}"
@@ -310,9 +310,10 @@ class AgeGate(commands.Cog):
                     pass  # DMs closed or failed
 
                 try:
+                    min_age_readable = self._seconds_to_readable(settings['min_age_seconds'])
                     await guild.ban(
                         member,
-                        reason=f"AgeGate: Account younger than {settings['min_age_days']} days. Reason: {reason}"
+                        reason=f"AgeGate: Account younger than {min_age_readable}. Reason: {reason}"
                     )
                     self._get_logger().info(
                         f"[AgeGate] Banned new account: {member.display_name} ({member.id}) from {guild.name}."
@@ -321,7 +322,7 @@ class AgeGate(commands.Cog):
                     await self._increment_ban_counter(guild)
 
                     if settings["ban_type"] == "temporary":
-                        unban_time = now + timedelta(days=settings["temp_ban_duration_days"])
+                        unban_time = now + timedelta(seconds=settings["temp_ban_duration_seconds"])
                         async with self.config.guild(guild).temp_banned_users() as temp_banned_users:
                             temp_banned_users[str(member.id)] = unban_time.timestamp()
 
